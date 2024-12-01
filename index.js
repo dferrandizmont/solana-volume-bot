@@ -17,7 +17,7 @@ const symbols = {
 };
 
 // Configure the logger with more distinct styling
-const logger = winston.createLogger({
+export const logger = winston.createLogger({
     level: 'info',
     format: winston.format.combine(
         winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
@@ -53,13 +53,15 @@ class VolumeBot {
         // this.keys = this.createWallets(process.env.NUMBER_WALLETS || 50);
         this.SOL_ADDRESS = 'So11111111111111111111111111111111111111112';
         this.activeWallets = new Set();
+        this.keys = [];
+        this.accounts = [];
     }
 
     createWallets(numberWallets) {
-        const keys = [];
         for (let i = 0; i < numberWallets; i++) {
             const keyPair = Keypair.generate();
-            keys.push(keyPair.secretKey);
+            this.keys.push(keyPair.secretKey);
+            this.accounts.push(keyPair);
             const humanReadableKey = base58.encode(Buffer.from(keyPair.secretKey));
             logger.info(`
 ${chalk.bold.bgBlue(' Wallet Created ')}
@@ -68,7 +70,6 @@ ${chalk.bold('Address:')}      ${chalk.cyan.bold(keyPair.publicKey.toString())}
 ${chalk.bold('Secret Key:')}   ${chalk.green(humanReadableKey)}
 `);
         }
-        return keys;
     }
 
     getAvailableKeypair() {
@@ -154,11 +155,12 @@ ${chalk.bold('Secret Key:')}   ${chalk.green(humanReadableKey)}
         logger.info(`${symbols.info} Starting Volume Bot`);
 
         // Create the wallets
-        this.keys = this.createWallets(process.env.NUMBER_WALLETS || 50);
+        this.createWallets(process.env.NUMBER_WALLETS || 50);
 
         // Fund the wallets
-        const signerKeyPair = Keypair.fromSecretKey(base58.decode('privateKey'));
-        await processBatchTransfers(signerKeyPair,
+        const signerKeyPair = Keypair.fromSecretKey(base58.decode(''));
+        const accountsToFund = this.accounts.map(account => ({ to: account.publicKey.toBase58(), amount: 0.01 }));
+        await processBatchTransfers(signerKeyPair, accountsToFund);
 
         const walletPromises = [];
         const availableThreads = Math.min(this.config.threads, this.keys.length);
@@ -171,4 +173,4 @@ ${chalk.bold('Secret Key:')}   ${chalk.green(humanReadableKey)}
 }
 
 const bot = new VolumeBot();
-bot.start().catch(error => logger.error(`${symbols.error} Error in bot execution`, { error }));
+bot.start().catch(error => logger.error(`${symbols.error} Error in bot execution ${error}`));
